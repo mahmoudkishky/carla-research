@@ -69,14 +69,14 @@ class dataCollector:
         settings = self.world.get_settings()
         settings.fixed_delta_seconds = configs.SIM_TICK
         settings.synchronous_mode = True
-        settings.no_rendering_mode = False
         self.world.apply_settings(settings)
 
         self.trafficManager = self.client.get_trafficmanager(8000)
         self.trafficManager.set_synchronous_mode(True)
 
+        self.trafficManager.global_percentage_speed_difference(40)
+
         if(isTesting):
-            self.trafficManager.global_percentage_speed_difference(20)
             self.isTesting = True
         else:
             self.isTesting = False
@@ -92,7 +92,7 @@ class dataCollector:
         ego_bp = self.world.get_blueprint_library().find('vehicle.lincoln.mkz_2017')
         ego_bp.set_attribute('role_name', 'hero')
 
-        if(self.isTesting):
+        if(isTesting):
             self.egoVehicle = self.world.try_spawn_actor(ego_bp, spawn_points[startpoint])
             #self.egoVehicle = self.world.try_spawn_actor(ego_bp, random.choice(spawn_points))
         else:
@@ -200,15 +200,15 @@ class dataCollector:
             # random max speed
             self.pedestrianList[i].set_max_speed(1 + random.random())
 
-        if isTesting:
-            traffic_lights = self.world.get_actors().filter('traffic.traffic_light')
-            for traffic_light in traffic_lights:
-                traffic_light.set_state(carla.TrafficLightState.Green)
-                traffic_light.freeze(True)
+        #if isTesting:
+        traffic_lights = self.world.get_actors().filter('traffic.traffic_light')
+        for traffic_light in traffic_lights:
+            traffic_light.set_state(carla.TrafficLightState.Green)
+            traffic_light.freeze(True)
 
         # Make all vehicles move in autopilot mode
-        for vehicle in self.world.get_actors().filter('*vehicle*'):
-            vehicle.set_autopilot(True)
+        #for vehicle in self.world.get_actors().filter('*vehicle*'):
+            #vehicle.set_autopilot(True)
 
         return succeed
 
@@ -218,6 +218,7 @@ class dataCollector:
         im = np.array(data.raw_data, dtype = np.dtype("uint8"))
         im = np.reshape(im, (configs.IMAGE_Y, configs.IMAGE_X, 4))
         im = im[:, :, :3]
+        im = im[configs.IMAGE_CUT[0]: configs.IMAGE_CUT[1], :, :3]
         im = cv2.resize(im, dsize = (configs.IMAGE_RESIZE_X, configs.IMAGE_RESIZE_Y), interpolation = cv2.INTER_CUBIC)
         cv2.imwrite(configs.DATASET_PATH + '/episode_'+ str(self.currentEpisodeIndex)+'/' + str(sensor) + '/CameraRGB_'+str('{:08d}'.format(self.currentSimulationStep))+'.png', im)
 
@@ -252,11 +253,8 @@ class dataCollector:
             control = self.egoVehicle.get_control()
                     
             # speed from m/s to km/hr
-            #if(self.isTesting):
-                #speed = 3.6 * np.sqrt((self.egoVehicle.get_velocity().x**2) + (self.egoVehicle.get_velocity().y**2) + (self.egoVehicle.get_velocity().z**2))
-                #if(speed >= 70):
-                    #control.throttle = self.egoVehicle.get_control().throttle / 2.0
-                
+            speed = 3.6 * np.sqrt((self.egoVehicle.get_velocity().x**2) + (self.egoVehicle.get_velocity().y**2))
+     
             if((not applySteeringNoise) and ((self.currentSimulationStep * configs.SIM_TICK) % configs.APLLY_STEERING_NOISE_EVERY_SEC == 0) and (random.random() <= configs.APPLY_NOISE_PROBABILITY)):
                         
                 applySteeringNoise = True
@@ -264,8 +262,7 @@ class dataCollector:
                 applyNoiseDuration  = random.randrange(int(configs.APPLY_NOISE_MIN_T / configs.SIM_TICK), int(configs.APPLY_NOISE_MAX_T / configs.SIM_TICK) + 1)
                 applyNoiseIntensity = random.uniform(configs.NOISE_INTENSITY_MIN, configs.NOISE_INTENSITY_MAX)
                 applyNoiseSign = 1 if random.random() < 0.5 else -1  # 50% noise samples +ve and 50% -ve
-                applyNoiseSign = 1
-
+ 
             if(applySteeringNoise):
                         
                 noise = applyNoiseSign * applyNoiseIntensity * max(0, 1 - abs( 2 * (self.currentSimulationStep - applyNoiseStartStep) / applyNoiseDuration - 1))
@@ -283,6 +280,10 @@ class dataCollector:
                                         self.egoVehicle.get_control().steer,
                                         self.egoVehicle.get_control().throttle,
                                         self.egoVehicle.get_control().brake,
+                                        speed,
+                                        self.egoVehicle.get_transform().rotation.yaw,
+                                        self.egoVehicle.get_transform().location.x,
+                                        self.egoVehicle.get_transform().location.y,
                                         navigation])
                     
             self.csv_file.flush()
@@ -307,7 +308,7 @@ class dataCollector:
             # ego vehicle control file
             self.csv_file = open('./dataset/episode_' + str(episode) + '/control.csv', 'w+')
             self.csv_writer = csv.writer(self.csv_file, delimiter=',')
-            self.csv_writer.writerow(['step', 'steering_angle', 'throttle','brake', 'command'])
+            self.csv_writer.writerow(['step', 'steering_angle', 'throttle','brake', 'speed', 'yaw', 'loc_x', 'loc_y', 'command'])
             self.csv_file.flush()
 
     def cleanup(self):
@@ -352,7 +353,10 @@ def main():
         weather = random.choice(configs.PREDEFINED_WEATHER_LIST)
         town = random.choice(configs.SIMULATION_TOWN_LIST)
     
-        success = collector.setup_episode_settings(town, traffic_denisty, pedestrian_denisty, weather, False)
+        traffic_denisty = 0
+        pedestrian_denisty = 0
+
+        success = collector.setup_episode_settings(town, traffic_denisty, pedestrian_denisty, weather, False, 0)
         
         if success:
             print("start simulation...")

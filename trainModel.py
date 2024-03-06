@@ -20,29 +20,25 @@ def loadDataset(balance):
     traingIds = {key: None for key in trainingConfigs.BRANCHES}
     validationIds = {key: None for key in trainingConfigs.BRANCHES}
 
+    q_low = -0.8
+    q_hi = 0.8
+    
     for branch in trainingConfigs.BRANCHES:
 
         data[branch] = read_csv(configs.BRANCHES_DATASET_PATH + branch + '/control.csv')
-
+        
+        dropped = data[branch][(data[branch]['steering_angle'] < q_low) | (data[branch]['steering_angle'] > q_hi)].sample(frac = 1.0, replace=False)
+        data[branch] = data[branch].drop(list(dropped.index), axis = 0)
+        
         if balance:
 
             # remove majority samples to ensure we have balanced learning
-            steer = data[branch]['steering_angle']
-            data[branch]['int_steer'] = np.array(configs.VEHICLE_MAX_STEER * steer, dtype = 'float32').astype(int)
-
-            q_low = data[branch]['int_steer'].quantile(0.025)
-            q_hi  = data[branch]['int_steer'].quantile(0.975)
-
-            dropped = data[branch][(data[branch]['int_steer'] < q_low) | (data[branch]['int_steer'] > q_hi)].sample(frac = 1.0, replace=False)
-            data[branch] = data[branch].drop(list(dropped.index), axis = 0)
-
-            dropped = data[branch][(data[branch]['throttle'] <= 0.05) & (np.abs(data[branch]['int_steer']) <= 2)].sample(frac = 1.0, replace=False)
+            dropped = data[branch][np.abs(data[branch]['steering_angle']) <= 0.05].sample(frac = 0.80, replace=False)
             data[branch] = data[branch].drop(list(dropped.index), axis = 0)
             
-
         dataIds = np.array(data[branch]['Id'])
         np.random.shuffle(dataIds)
-        traingIds[branch], validationIds[branch] = train_test_split(dataIds, test_size = 0.1)
+        traingIds[branch], validationIds[branch] = train_test_split(dataIds, test_size = 0.15)
 
     return data, traingIds, validationIds
 
@@ -73,11 +69,11 @@ def main():
         print('loading weights ....')
         model.load_weights("./outputs/steering_model.keras",True)
 
-    #callback = tf.keras.callbacks.LearningRateScheduler(AdamoptimizersScheduler)
-
+    callback = tf.keras.callbacks.ModelCheckpoint("./outputs/cp-{epoch:04d}.keras", verbose = 1, save_weights_only = True, save_freq = 'epoch')
+    
     # Train model on dataset
-    #model.fit(training_generator, epochs = trainingConfigs.EPOCHS, validation_data = validation_generator, callbacks = [callback])
-    model.fit(training_generator, epochs = trainingConfigs.EPOCHS, validation_data = validation_generator)
+    model.fit(training_generator, epochs = trainingConfigs.EPOCHS, validation_data = validation_generator, callbacks = [callback])
+    #model.fit(training_generator, epochs = trainingConfigs.EPOCHS, validation_data = validation_generator)
 
     model.save_weights("./outputs/steering_model.keras", True)
 

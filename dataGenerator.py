@@ -29,6 +29,14 @@ def create_augmenter():
     ], random_order=True)                                                          # order is shuffled each time with equal probability
     return seq
 
+
+def assign_steering_label(steering_angle, branch):
+
+    angle_norm = steering_angle - trainingConfigs.BRANCHE_MIN_ANGLE[trainingConfigs.BRANCHES.index(branch)]
+    label = int(round(10 * angle_norm))
+
+    return label
+
 class DataGenerator(Sequence):
 
     'Generates data for Keras'
@@ -45,8 +53,7 @@ class DataGenerator(Sequence):
         self.isClassification = isClassification
 
     def __len__(self):
-        return int(np.floor(min(len(val) for val in self.dataIds.values()) / (self.batch_size / 4)))
-        #return int(np.floor(min(len(val) for val in self.dataIds.values()) / (self.batch_size)))
+        return int(np.floor(min(len(val) for val in self.dataIds.values()) / (self.batch_size / len(trainingConfigs.BRANCHES))))
 
     def __getitem__(self, index):
 
@@ -54,8 +61,7 @@ class DataGenerator(Sequence):
         batchIds = {key: None for key in trainingConfigs.BRANCHES}
 
         for branch in trainingConfigs.BRANCHES:
-            batchIds[branch] = [self.dataIds[branch][k] for k in range(index * int(self.batch_size / 4), (index + 1) * int(self.batch_size / 4))]
-            #batchIds[branch] = [self.dataIds[branch][k] for k in range(index * int(self.batch_size), (index + 1) * int(self.batch_size))]
+            batchIds[branch] = [self.dataIds[branch][k] for k in range(index * int(self.batch_size / len(trainingConfigs.BRANCHES)), (index + 1) * int(self.batch_size / len(trainingConfigs.BRANCHES)))]
 
         # Generate data-
         X, Y = self.__data_generation(batchIds)
@@ -74,6 +80,7 @@ class DataGenerator(Sequence):
         X1 = np.empty((self.batch_size, *self.dim), dtype = np.dtype("uint8"))
         X2 = np.empty((self.batch_size, *self.dim), dtype = np.dtype("uint8"))
         X3 = np.empty((self.batch_size, *self.dim), dtype = np.dtype("uint8"))
+        YAW = np.empty((self.batch_size), dtype = np.dtype("uint8"))
         
         if self.isClassification:
             Y = np.zeros((self.batch_size, sum(trainingConfigs.BRANCHE_CLASS_COUNT)), dtype = np.dtype("float32"))
@@ -83,21 +90,25 @@ class DataGenerator(Sequence):
         # Generate data
         for branch in trainingConfigs.BRANCHES:
 
-            branch_idx = trainingConfigs.BRANCHES.index(branch) * int(self.batch_size / 4)
+            branch_idx = trainingConfigs.BRANCHES.index(branch) * int(self.batch_size / len(trainingConfigs.BRANCHES))
             class_idx = sum(trainingConfigs.BRANCHE_CLASS_COUNT[0 : trainingConfigs.BRANCHES.index(branch)])
-            #branch_idx = 0
-
-            for i in range(0, int(self.batch_size / 4)):
-            #for i in range(0, int(self.batch_size)):
+            
+            for i in range(0, int(self.batch_size / len(trainingConfigs.BRANCHES))):
+                
                 X1[branch_idx + i,] = np.array(cv2.imread(configs.BRANCHES_DATASET_PATH + branch + '/FrontCam/' + str(tempDataIds[branch][i]) + '.png'))
                 X2[branch_idx + i,] = np.array(cv2.imread(configs.BRANCHES_DATASET_PATH + branch + '/LeftCam/' + str(tempDataIds[branch][i]) + '.png'))
                 X3[branch_idx + i,] = np.array(cv2.imread(configs.BRANCHES_DATASET_PATH + branch + '/RightCam/' + str(tempDataIds[branch][i]) + '.png'))
-       
+                YAW[branch_idx + i,] = self.data[branch].loc[tempDataIds[branch][i]]['yaw']
+
                 if self.isClassification:
-                    Y[branch_idx + i].__setitem__(slice(class_idx, class_idx + trainingConfigs.BRANCHE_CLASS_COUNT[trainingConfigs.BRANCHES.index(branch)]), one_hot(int(self.data[branch].loc[tempDataIds[branch][i]]['steering_angle'] * configs.VEHICLE_MAX_STEER) - trainingConfigs.BRANCHE_MIN_ANGLE[trainingConfigs.BRANCHES.index(branch)], depth = trainingConfigs.BRANCHE_CLASS_COUNT[trainingConfigs.BRANCHES.index(branch)]))
+
+                    label = int(round(((self.data[branch].loc[tempDataIds[branch][i]]['steering_angle'] - trainingConfigs.BRANCHE_MIN_ANGLE[trainingConfigs.BRANCHES.index(branch)]) / trainingConfigs.STEER_CLASS_STEP[trainingConfigs.BRANCHES.index(branch)])))
+                    Y[branch_idx + i].__setitem__(slice(class_idx, class_idx + trainingConfigs.BRANCHE_CLASS_COUNT[trainingConfigs.BRANCHES.index(branch)]), one_hot(label, depth = trainingConfigs.BRANCHE_CLASS_COUNT[trainingConfigs.BRANCHES.index(branch)]))
+
                 else:
                     Y[branch_idx + i] = self.data[branch].loc[tempDataIds[branch][i]]['steering_angle']
-
+            
+        
         if self.isAugmentation:
             aug1 = self.augmenter.augment_images(np.array([X1[i] for i in range(self.batch_size)], dtype = np.uint8))
             aug2 = self.augmenter.augment_images(np.array([X2[i] for i in range(self.batch_size)], dtype = np.uint8))
@@ -123,4 +134,4 @@ class DataGenerator(Sequence):
         """
         
 
-        return [aug1 / 255., aug2 / 255., aug3 / 255.], Y
+        return [aug1 / 255., aug2 / 255., aug3 / 255., YAW / 180.], Y

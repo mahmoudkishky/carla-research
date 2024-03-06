@@ -19,7 +19,7 @@ def main():
         id  = 0
         csv_file = open(configs.BRANCHES_DATASET_PATH + branch + '/control.csv', 'w+')
         csv_writer = csv.writer(csv_file, delimiter=',')
-        csv_writer.writerow(['Id', 'steering_angle', 'throttle','brake', 'command'])
+        csv_writer.writerow(['Id', 'steering_angle', 'throttle','brake', 'speed', 'yaw', 'loc_x', 'loc_y', 'command'])
         csv_file.flush()
         
         for episode in range(configs.EPISODE_COUNT):
@@ -51,6 +51,10 @@ def main():
                                         branch_df.loc[step,'steering_angle'],
                                         branch_df.loc[step,'throttle'],
                                         branch_df.loc[step,'brake'],
+                                        branch_df.loc[step,'speed'],
+                                        branch_df.loc[step,'yaw'],
+                                        branch_df.loc[step,'loc_x'],
+                                        branch_df.loc[step,'loc_y'],
                                         branch_df.loc[step,'command']])
 
                         csv_file.flush()

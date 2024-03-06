@@ -7,8 +7,8 @@ DATASET_PATH = '/home/kishky/master/carla-research/dataset/'
 BRANCHES_DATASET_PATH = '/home/kishky/master/carla-research/dataset_branches/'
 
 EPISODE_SIMULATION_DURATION_SEC = 600    # 10 minutes long
-EPISODE_START                   = 0
-EPISODE_COUNT                   = 600    # number of episodes to be simulated
+EPISODE_START                   = 100
+EPISODE_COUNT                   = 150    # number of episodes to be simulated
 
 TRAFFIC_DENISTY_MIN             = 30
 TRAFFIC_DENISTY_MAX             = 60
@@ -18,6 +18,7 @@ PEDESTRIAN_DESNISTY_MAX         = 80
 
 IMAGE_X                         = 800
 IMAGE_Y                         = 600
+IMAGE_CUT                       = [100, 500]
 
 IMAGE_RESIZE_X                  = 200
 IMAGE_RESIZE_Y                  = 88
@@ -40,11 +41,12 @@ VEHICLE_WHEEL_BASE = 2.89
 
 # Steering wheel noise
 APLLY_STEERING_NOISE_EVERY_SEC = 1
-APPLY_NOISE_PROBABILITY = 0.6
+APPLY_NOISE_PROBABILITY = 0.5
 APPLY_NOISE_MIN_T = 0.2
-APPLY_NOISE_MAX_T = 0.35
+APPLY_NOISE_MAX_T = 0.4
 NOISE_INTENSITY_MIN = 0.05
-NOISE_INTENSITY_MAX = 0.09
+NOISE_INTENSITY_MAX = 0.1
+
 
 PREDEFINED_WEATHER_LIST = [
 carla.WeatherParameters.ClearNoon,
@@ -53,14 +55,15 @@ carla.WeatherParameters.ClearNoon,
 #carla.WeatherParameters.WetCloudyNoon,
 #carla.WeatherParameters.MidRainyNoon,
 #carla.WeatherParameters.HardRainNoon,
-carla.WeatherParameters.SoftRainNoon,
+#carla.WeatherParameters.SoftRainNoon,
 carla.WeatherParameters.ClearSunset,
 #carla.WeatherParameters.CloudySunset,
 #carla.WeatherParameters.WetSunset,
 #carla.WeatherParameters.WetCloudySunset,
 #carla.WeatherParameters.MidRainSunset,
 #carla.WeatherParameters.HardRainSunset,
-carla.WeatherParameters.SoftRainSunset]
+#carla.WeatherParameters.SoftRainSunset
+]
 
 SIMULATION_TOWN_LIST = [
 'Town01',
